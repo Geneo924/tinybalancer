@@ -8,14 +8,13 @@ import (
 )
 
 type Backend struct {
-	URL				*url.URL
-	Alive			bool
-	mux				sync.RWMutex
-	ReverseProxy	*httputil.ReverseProxy
+	URL          *url.URL
+	Alive        bool
+	mux          sync.RWMutex
+	ReverseProxy *httputil.ReverseProxy
 }
 
 type ServerPool struct {
-	Backends 	 []*Backend
-	current uint64
+	Backends []*Backend
+	current  uint64
 }
-
