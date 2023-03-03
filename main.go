@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 )
 
+
 type Backend struct {
 	URL          *url.URL
 	Alive        bool
@@ -53,7 +54,7 @@ func (s *ServerPool) GetNextPeer() *Backend {
 	return nil
 }
 
-func loadbalancer(w http.ResponseWriter, r *http.Request){
+func loadbalancer(w http.ResponseWriter, r *http.Request, serverPool *ServerPool){
 	peer := serverPool.GetNextPeer()
 	if peer != nil{
 		peer.ReverseProxy.ServeHTTP(w,r)
