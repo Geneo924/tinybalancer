@@ -47,8 +47,8 @@ type ServerPool struct {
 }
 
 // store a backend instance inside the serverpool
-func(s *ServerPool) addBackend(b *Backend){
-	s.Backends = append(s.Backends, b);
+func (s *ServerPool) addBackend(b *Backend) {
+	s.Backends = append(s.Backends, b)
 
 }
 
@@ -57,10 +57,10 @@ func (s *ServerPool) NextIndex() int {
 	return int(atomic.AddUint64(&s.current, uint64(1)) % uint64(len(s.Backends)))
 }
 
-//  changes the status of a backend, if down
-func(s *ServerPool) MarkBackendStatus(backendUrl *url.URL, alive bool){
-	for _, i:= range s.Backends {
-		if i.URL.String() == backendUrl.String(){
+// changes the status of a backend, if down
+func (s *ServerPool) MarkBackendStatus(backendUrl *url.URL, alive bool) {
+	for _, i := range s.Backends {
+		if i.URL.String() == backendUrl.String() {
 			i.SetAlive(alive)
 			break
 		}
@@ -68,10 +68,10 @@ func(s *ServerPool) MarkBackendStatus(backendUrl *url.URL, alive bool){
 }
 
 // checks whether a backend is alive by establishing a TCP connection
-func isBackendAlive(u *url.URL) bool{
-	timeout:= 2 * time.Second
+func isBackendAlive(u *url.URL) bool {
+	timeout := 2 * time.Second
 	conn, err := net.DialTimeout("tcp", u.Host, timeout)
-	if err != nil{
+	if err != nil {
 		log.Println("Site unreachable")
 		return false
 	}
@@ -79,7 +79,7 @@ func isBackendAlive(u *url.URL) bool{
 	return true
 }
 
-
+// gets next available server thats available for a connection
 func (s *ServerPool) GetNextPeer() *Backend {
 	next := s.NextIndex()
 	length := len(s.Backends) + next
@@ -95,25 +95,40 @@ func (s *ServerPool) GetNextPeer() *Backend {
 	return nil
 }
 
+// GetAttemptsFromContext returns the amount of attempts for request
+func GetAttemptsFromContext(r *http.Request) int {
+	if attempts, ok := r.Context().Value(Attempts).(int); ok {
+		return attempts
+	}
+	return 1
+}
 
-func loadbalancer(w http.ResponseWriter, r *http.Request, serverPool *ServerPool){
+// GetAttemptsFromContext returns the amount of retries for the request
+func GetRetryFromContext(r *http.Request) int {
+	if retry, ok := r.Context().Value(Retry).(int); ok {
+		return retry
+	}
+	return 0
+}
+
+var maxAttemps = 3
+
+func loadbalancer(w http.ResponseWriter, r *http.Request, serverPool *ServerPool) {
+	attempts := GetAttemptsFromContext(r)
+	if attempts > maxAttemps {
+		log.Printf("%s(%s) Max attempts reached, terminating\n", r.RemoteAddr, r.URL.Path)
+		http.Error(w, "Service not available", http.StatusServiceUnavailable)
+		return
+	}
 	peer := serverPool.GetNextPeer()
-	if peer != nil{
-		peer.ReverseProxy.ServeHTTP(w,r)
+	if peer != nil {
+		peer.ReverseProxy.ServeHTTP(w, r)
 		return
 	}
 	http.Error(w, "Service not available", http.StatusServiceUnavailable)
-	
 }
 
 func main() {
-	u, _ := url.Parse("http://localhost:8080")
-	rp := httputil.NewSingleHostReverseProxy(u)
-
-	handler := http.HandlerFunc(rp.ServeHTTP)
-
-	if err := http.ListenAndServe(":8081", handler); err != nil {
-		panic(err)
-	}
-
+	
+	
 }
