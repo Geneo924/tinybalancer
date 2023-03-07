@@ -40,7 +40,6 @@ func (b *Backend) IsAlive() (alive bool) {
 	b.mux.RUnlock()
 	return
 }
-
 type ServerPool struct {
 	Backends []*Backend
 	current  uint64
