@@ -25,6 +25,7 @@ type Backend struct {
 	Alive        bool
 	mux          sync.RWMutex
 	ReverseProxy *httputil.ReverseProxy
+	Connections  int64
 }
 
 func (b *Backend) SetAlive(alive bool) {
@@ -47,7 +48,6 @@ type ServerPool struct {
 
 func (s *ServerPool) addBackend(b *Backend) {
 	s.Backends = append(s.Backends, b)
-
 }
 
 func (s *ServerPool) NextIndex() int {
@@ -75,16 +75,18 @@ func isBackendAlive(u *url.URL) bool {
 }
 
 func (s *ServerPool) GetNextPeer() *Backend {
-	next := s.NextIndex()
-	length := len(s.Backends) + next
-	for i := next; i < length; i++ {
-		idx := i % len(s.Backends)
-		if s.Backends[idx].IsAlive() {
-			if i != next {
-				atomic.StoreUint64(&s.current, uint64(idx))
-			}
-			return s.Backends[idx]
+	var leastConn *Backend
+	for _, b := range s.Backends {
+		if !b.IsAlive() {
+			continue
 		}
+		if leastConn == nil || b.Connections < leastConn.Connections {
+			leastConn = b
+		}
+	}
+	if leastConn != nil {
+		atomic.AddInt64(&leastConn.Connections, 1)
+		return leastConn
 	}
 	return nil
 }
